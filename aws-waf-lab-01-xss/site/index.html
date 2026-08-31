@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="AWS WAF Security Lab - Projeto 01: Proteção contra XSS com CloudFront e Amazon S3" />
+    <title>AWS WAF Security Lab - Projeto 01 | Proteção XSS</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <header class="hero">
+        <div class="hero-content">
+            <div class="badge">AWS WAF Security Lab</div>
+            <h1>Projeto 01</h1>
+            <h2>Proteção contra XSS</h2>
+            <p class="hero-sub">CloudFront + Amazon S3</p>
+            <div class="hero-tags">
+                <span class="tag">Route 53</span>
+                <span class="tag">ACM</span>
+                <span class="tag">CloudFront</span>
+                <span class="tag">AWS WAF</span>
+                <span class="tag">Amazon S3</span>
+                <span class="tag">CloudWatch</span>
+            </div>
+        </div>
+    </header>
+
+    <nav class="navbar">
+        <a href="#sobre">Sobre</a>
+        <a href="#xss">O que é XSS</a>
+        <a href="#arquitetura">Arquitetura</a>
+        <a href="#resultado">Resultado</a>
+        <a href="#teste">Teste</a>
+    </nav>
+
+    <main>
+        <!-- SOBRE O PROJETO -->
+        <section id="sobre" class="section">
+            <h2 class="section-title">Sobre o Projeto</h2>
+            <div class="card">
+                <p>
+                    Este laboratório demonstra como o <strong>AWS WAF</strong> pode identificar e
+                    bloquear padrões relacionados a <strong>Cross-Site Scripting (XSS)</strong>
+                    antes que a requisição alcance a aplicação.
+                </p>
+                <p>Existem dois endpoints neste laboratório:</p>
+                <div class="endpoint-grid">
+                    <div class="endpoint endpoint-open">
+                        <div class="endpoint-icon">&#128275;</div>
+                        <h3>SEM WAF</h3>
+                        <p>Requisições passam direto para o CloudFront/origem, sem inspeção de WAF.</p>
+                    </div>
+                    <div class="endpoint endpoint-protected">
+                        <div class="endpoint-icon">&#128737;</div>
+                        <h3>COM WAF</h3>
+                        <p>Requisições são inspecionadas pelo AWS WAF antes de chegar ao S3.</p>
+                    </div>
+                </div>
+                <p class="note">
+                    Ambos os endpoints mostram exatamente o <strong>mesmo conteúdo</strong>
+                    armazenado no S3. A única diferença é a presença da Web ACL do AWS WAF.
+                </p>
+            </div>
+        </section>
+
+        <!-- O QUE É XSS -->
+        <section id="xss" class="section">
+            <h2 class="section-title">O que é XSS</h2>
+            <div class="card">
+                <p>
+                    <strong>Cross-Site Scripting (XSS)</strong> é uma vulnerabilidade na qual
+                    conteúdo contendo scripts maliciosos pode ser enviado para uma aplicação web.
+                </p>
+                <div class="highlight-box">
+                    <p>
+                        <strong>Importante:</strong> Neste laboratório <em>nenhum script será
+                        efetivamente executado</em> no servidor.
+                    </p>
+                    <p>
+                        O objetivo é apenas enviar uma string com padrão característico de XSS
+                        para verificar se o AWS WAF identifica e bloqueia a requisição.
+                    </p>
+                </div>
+                <p>Exemplo de padrão típico de XSS enviado via query string:</p>
+                <pre><code>?search=&lt;script&gt;alert(1)&lt;/script&gt;</code></pre>
+            </div>
+        </section>
+
+        <!-- ARQUITETURA -->
+        <section id="arquitetura" class="section">
+            <h2 class="section-title">Arquitetura</h2>
+            <div class="arch-grid">
+                <div class="card arch-card">
+                    <h3>SEM WAF</h3>
+                    <div class="flow">
+                        <div class="flow-node">Internet</div>
+                        <div class="flow-arrow">&#8595;</div>
+                        <div class="flow-node">Route 53</div>
+                        <div class="flow-arrow">&#8595;</div>
+                        <div class="flow-node">CloudFront</div>
+                        <div class="flow-arrow">&#8595;</div>
+                        <div class="flow-node flow-s3">S3</div>
+                    </div>
+                </div>
+                <div class="card arch-card arch-protected">
+                    <h3>COM WAF</h3>
+                    <div class="flow">
+                        <div class="flow-node">Internet</div>
+                        <div class="flow-arrow">&#8595;</div>
+                        <div class="flow-node">Route 53</div>
+                        <div class="flow-arrow">&#8595;</div>
+                        <div class="flow-node">CloudFront</div>
+                        <div class="flow-arrow">&#8595;</div>
+                        <div class="flow-node flow-waf">AWS WAF</div>
+                        <div class="flow-arrow">&#8595;</div>
+                        <div class="flow-node flow-s3">S3</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- RESULTADO -->
+        <section id="resultado" class="section">
+            <h2 class="section-title">Resultado Esperado</h2>
+            <div class="card">
+                <table class="result-table">
+                    <thead>
+                        <tr>
+                            <th>Teste</th>
+                            <th>SEM WAF</th>
+                            <th>COM WAF</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Requisição normal</td>
+                            <td><span class="status status-ok">200</span></td>
+                            <td><span class="status status-ok">200</span></td>
+                        </tr>
+                        <tr>
+                            <td>XSS controlado</td>
+                            <td><span class="status status-ok">200</span></td>
+                            <td><span class="status status-block">403 BLOCKED</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="note">
+                    Os códigos podem variar dependendo da configuração final, mas o objetivo é
+                    demonstrar que o endpoint protegido pelo WAF bloqueia o padrão XSS.
+                </p>
+            </div>
+        </section>
+
+        <!-- TESTE INTERATIVO -->
+        <section id="teste" class="section">
+            <h2 class="section-title">Teste Controlado</h2>
+            <div class="card">
+                <p>
+                    Informe os dois endpoints do laboratório e gere as URLs de teste. O teste
+                    XSS só deve ser executado contra os <strong>seus próprios endpoints</strong>
+                    criados neste laboratório.
+                </p>
+                <div class="form-group">
+                    <label for="urlSemWaf">URL SEM WAF</label>
+                    <input type="text" id="urlSemWaf" placeholder="https://s3-sem-waf.seu-dominio.com" />
+                </div>
+                <div class="form-group">
+                    <label for="urlComWaf">URL COM WAF</label>
+                    <input type="text" id="urlComWaf" placeholder="https://s3-com-waf.seu-dominio.com" />
+                </div>
+                <button id="btnGerar" class="btn">Gerar URLs de teste</button>
+
+                <div id="resultado-teste" class="test-output hidden">
+                    <h3>URLs geradas</h3>
+                    <div class="url-block">
+                        <span class="url-label">SEM WAF - Normal</span>
+                        <code id="outSemNormal"></code>
+                    </div>
+                    <div class="url-block">
+                        <span class="url-label">SEM WAF - XSS</span>
+                        <code id="outSemXss"></code>
+                    </div>
+                    <div class="url-block">
+                        <span class="url-label">COM WAF - Normal</span>
+                        <code id="outComNormal"></code>
+                    </div>
+                    <div class="url-block">
+                        <span class="url-label">COM WAF - XSS (esperado 403)</span>
+                        <code id="outComXss"></code>
+                    </div>
+                    <p class="note">
+                        As URLs de XSS já vêm com <strong>URL encoding</strong> aplicado ao
+                        payload quando necessário.
+                    </p>
+                </div>
+
+                <div class="warning-box">
+                    <strong>&#9888; Uso responsável:</strong> execute testes apenas contra os
+                    endpoints deste laboratório. Não realize DDoS, stress test, flood ou ataques
+                    contra sistemas de terceiros.
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>AWS WAF Security Lab &mdash; Projeto 01 &mdash; Proteção XSS com CloudFront + Amazon S3</p>
+        <p class="footer-sub">Laboratório educacional. Lembre-se de excluir os recursos após concluir.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
