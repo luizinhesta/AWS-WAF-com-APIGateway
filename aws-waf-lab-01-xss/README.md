@@ -15,6 +15,11 @@ Publicar **dois endpoints** que servem exatamente o **mesmo conteúdo** de um ú
 - **SEM WAF** — uma requisição com padrão de XSS chega normalmente à origem.
 - **COM WAF** — a mesma requisição é **bloqueada com HTTP 403** antes de chegar ao S3.
 
+O endpoint COM WAF tem **duas proteções**:
+
+1. **XSS** (`Block-XSS-Lab`) — bloqueia o padrão de XSS na query string.
+2. **Geo-bloqueio** (`Block-Fora-do-Brasil`) — bloqueia **qualquer** requisição de fora do Brasil e responde com uma **página HTML de acesso negado** personalizada (`site/acesso-negado.html`). Para demonstrar, acesse o COM WAF por uma **VPN** ou **instância em outro país**.
+
 O teste de XSS é executado **exclusivamente contra os seus próprios endpoints** de laboratório. É um teste defensivo: mostra o WAF **bloqueando** um padrão de ataque, sem explorar nenhuma vítima.
 
 ### O que este laboratório NÃO faz
@@ -48,7 +53,7 @@ Payload usado no teste:
 | Amazon Route 53 | DNS dos subdomínios do laboratório |
 | AWS Certificate Manager (ACM) | Certificado TLS em `us-east-1` para o CloudFront |
 | Amazon CloudFront | Duas distribuições (uma sem WAF, uma com WAF) |
-| AWS WAF | 1 Web ACL (`waf-lab-xss`) + 1 regra de XSS (`Block-XSS-Lab`) |
+| AWS WAF | 1 Web ACL (`waf-lab-xss`) + 2 regras: XSS (`Block-XSS-Lab`) e geo-bloqueio (`Block-Fora-do-Brasil`) com resposta HTML personalizada |
 | Amazon S3 | Bucket privado de origem (a mesma origem para as duas distribuições) |
 | Amazon CloudWatch | Métricas e requisições amostradas do WAF |
 
@@ -59,9 +64,10 @@ Payload usado no teste:
 ```
 aws-waf-lab-01-xss/
 ├── site/
-│   ├── index.html      (site do laboratório)
+│   ├── index.html          (site do laboratório)
 │   ├── style.css
-│   └── script.js       (gera as URLs de teste com URL encoding)
+│   ├── script.js           (gera as URLs de teste com URL encoding)
+│   └── acesso-negado.html  (página HTML de acesso negado — resposta do WAF fora do Brasil)
 │
 ├── tests/
 │   ├── test-xss.py     (teste controlado em Python)
@@ -86,13 +92,13 @@ aws-waf-lab-01-xss/
 Python:
 
 ```bash
-python tests/test-xss.py --sem-waf https://s3-sem-waf.SEU-DOMINIO.com --com-waf https://s3-com-waf.SEU-DOMINIO.com
+python tests/test-xss.py --sem-waf https://site-sem-waf.SEU-DOMINIO.com --com-waf https://site-com-waf.SEU-DOMINIO.com
 ```
 
 PowerShell:
 
 ```powershell
-.\tests\test-xss.ps1 -UrlSemWaf "https://s3-sem-waf.SEU-DOMINIO.com" -UrlComWaf "https://s3-com-waf.SEU-DOMINIO.com"
+.\tests\test-xss.ps1 -UrlSemWaf "https://site-sem-waf.SEU-DOMINIO.com" -UrlComWaf "https://site-com-waf.SEU-DOMINIO.com"
 ```
 
 Saída esperada:
@@ -119,16 +125,17 @@ COM WAF
 
 | Teste | SEM WAF | COM WAF |
 |---|---|---|
-| Requisição normal | 200 | 200 |
-| XSS controlado | 200 | 403 BLOCKED |
+| Requisição normal (do Brasil) | 200 | 200 |
+| XSS controlado (do Brasil) | 200 | 403 BLOCKED |
+| Qualquer rota (de fora do Brasil) | 200 | 403 + página "Acesso negado" |
 
-> Os códigos podem variar conforme a configuração final, mas o objetivo é demonstrar que o endpoint protegido pelo WAF bloqueia o padrão XSS.
+> Os códigos podem variar conforme a configuração final, mas o objetivo é demonstrar que o endpoint protegido pelo WAF bloqueia o padrão XSS e nega acesso de fora do Brasil.
 
 ---
 
 ## Custos (leia antes de começar)
 
-O **AWS WAF não possui gratuidade permanente**. Ele cobra por Web ACL, por regra e por milhão de requisições avaliadas, enquanto existir. Este laboratório usa o mínimo de recursos (1 Web ACL + 1 regra + poucas requisições) e evita recursos premium.
+O **AWS WAF não possui gratuidade permanente**. Ele cobra por Web ACL, por regra e por milhão de requisições avaliadas, enquanto existir. Este laboratório usa o mínimo de recursos (1 Web ACL + 2 regras: XSS e geo-bloqueio + poucas requisições) e evita recursos premium.
 
 - ACM é gratuito para uso em CloudFront.
 - CloudFront e S3 têm uso mínimo neste lab.
@@ -141,4 +148,4 @@ A seção final de [IMPLANTACAO.md](IMPLANTACAO.md) traz o passo a passo de **ex
 
 ## Uso responsável
 
-Execute os testes **somente** contra os dois endpoints deste laboratório (`s3-sem-waf.SEU-DOMINIO.com` e `s3-com-waf.SEU-DOMINIO.com`). Não execute ataques contra terceiros e não gere flood, stress test ou DDoS.
+Execute os testes **somente** contra os dois endpoints deste laboratório (`site-sem-waf.SEU-DOMINIO.com` e `site-com-waf.SEU-DOMINIO.com`). Não execute ataques contra terceiros e não gere flood, stress test ou DDoS.

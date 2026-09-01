@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Acesso negado — AWS WAF Security Lab</title>
+    <style>
+        :root {
+            --aws-dark: #0f1b2d;
+            --aws-navy: #16243b;
+            --aws-orange: #ff9900;
+            --text: #e6edf3;
+            --text-muted: #9fb3c8;
+            --card-bg: #1b2a41;
+            --border: #2a3d59;
+            --red: #e5484d;
+            --radius: 12px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+            background: radial-gradient(circle at 20% 20%, #1d3350 0%, var(--aws-dark) 60%);
+            color: var(--text);
+            line-height: 1.65;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-top: 4px solid var(--red);
+            border-radius: var(--radius);
+            padding: 40px 32px;
+            max-width: 520px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .icon {
+            font-size: 3.4rem;
+            line-height: 1;
+            margin-bottom: 16px;
+        }
+
+        .code {
+            display: inline-block;
+            background: rgba(229, 72, 77, 0.18);
+            color: #ff6b6b;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            padding: 6px 16px;
+            border-radius: 999px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-size: 1.9rem;
+            font-weight: 800;
+            margin-bottom: 12px;
+        }
+
+        p {
+            color: var(--text-muted);
+            margin-bottom: 14px;
+        }
+
+        .reason {
+            background: rgba(255, 153, 0, 0.1);
+            border: 1px solid var(--aws-orange);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin: 22px 0 8px;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+
+        .reason strong {
+            color: var(--aws-orange);
+        }
+
+        .footer {
+            margin-top: 26px;
+            padding-top: 18px;
+            border-top: 1px solid var(--border);
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <div class="icon">🚫</div>
+        <span class="code">HTTP 403 — Acesso negado</span>
+        <h1>Você não tem acesso a este site</h1>
+        <p>Sua requisição foi bloqueada pelo <strong>AWS WAF</strong> antes de chegar à aplicação.</p>
+        <div class="reason">
+            Este conteúdo está disponível <strong>somente para acessos originados do Brasil</strong>.
+            Sua conexão parece vir de <strong>fora do Brasil</strong> e, por isso, o acesso foi negado.
+        </div>
+        <p>Se você acredita que isto é um engano, verifique se está usando uma <strong>VPN</strong> ou
+            proxy com saída em outro país e tente novamente a partir de uma conexão no Brasil.</p>
+        <div class="footer">
+            AWS WAF Security Lab &middot; Projeto 01 &middot; Bloqueio geográfico (regra <code>Block-Fora-do-Brasil</code>)
+        </div>
+    </main>
+</body>
+</html>

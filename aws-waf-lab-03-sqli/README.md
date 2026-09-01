@@ -15,6 +15,11 @@ Publicar **dois endpoints** que apontam para a **mesma API** (API Gateway REST +
 - **SEM WAF** (stage `sem-waf`) — uma requisição com padrão de SQL Injection chega à Lambda.
 - **COM WAF** (stage `com-waf`) — a mesma requisição é **bloqueada com HTTP 403** antes de chegar à Lambda.
 
+O stage `com-waf` tem **duas proteções**:
+
+1. **SQL Injection** (`Block-SQLi-Lab`) — bloqueia o padrão de SQLi na query string.
+2. **Geo-bloqueio** (`Block-Fora-do-Brasil`) — bloqueia **qualquer** requisição cujo IP de origem esteja **fora do Brasil**. Para demonstrar, acesse o `com-waf` a partir de uma **VPN** ou de uma **instância em outro país**: todas as rotas retornam 403.
+
 A principal evidência do laboratório é o **CloudWatch Logs / Invocations da Lambda**: SEM WAF a chamada aparece nos logs (a Lambda executou); COM WAF ela é bloqueada e **não** aparece (a Lambda não executou).
 
 ### O que este laboratório NÃO faz
@@ -48,7 +53,7 @@ A Lambda apenas **ecoa** o parâmetro `id` de volta. Os scripts de teste aplicam
 | AWS Certificate Manager (ACM) | Certificado TLS regional para os Custom Domains do API Gateway |
 | Amazon API Gateway (REST API) | Uma REST API com dois stages (`sem-waf` e `com-waf`) |
 | AWS Lambda | Função que responde às rotas (sem banco de dados) |
-| AWS WAF | 1 Web ACL **regional** (`waf-lab-sqli`) + 1 regra (`Block-SQLi-Lab`) |
+| AWS WAF | 1 Web ACL **regional** (`waf-lab-sqli`) + 2 regras (`Block-SQLi-Lab` e `Block-Fora-do-Brasil`) |
 | Amazon CloudWatch | Métricas e logs do WAF, do API Gateway e da Lambda |
 
 ---
@@ -129,14 +134,15 @@ COM WAF
 
 | Teste | SEM WAF | COM WAF |
 |---|---|---|
-| Normal | Lambda executa (200) | Lambda executa (200) |
-| SQL Injection | Lambda executa (200) | WAF bloqueia (403) |
+| Normal (do Brasil) | Lambda executa (200) | Lambda executa (200) |
+| SQL Injection (do Brasil) | Lambda executa (200) | WAF bloqueia (403) |
+| Qualquer rota (de fora do Brasil) | Lambda executa (200) | WAF bloqueia (403) |
 
 ---
 
 ## Custos (leia antes de começar)
 
-O **AWS WAF não possui gratuidade permanente**. Este lab usa o mínimo de recursos (1 Web ACL + 1 regra SQLi + pouquíssimas requisições) e evita recursos premium. API Gateway e Lambda têm free tier generoso e uso mínimo aqui; ACM é gratuito; Route 53 cobra pela zona hospedada. **A Web ACL do WAF é o principal custo contínuo — exclua-a ao terminar.** O passo a passo de exclusão está no final de [IMPLANTACAO.md](IMPLANTACAO.md).
+O **AWS WAF não possui gratuidade permanente**. Este lab usa o mínimo de recursos (1 Web ACL + 2 regras: SQLi e geo-bloqueio + pouquíssimas requisições) e evita recursos premium. API Gateway e Lambda têm free tier generoso e uso mínimo aqui; ACM é gratuito; Route 53 cobra pela zona hospedada. **A Web ACL do WAF é o principal custo contínuo — exclua-a ao terminar.** O passo a passo de exclusão está no final de [IMPLANTACAO.md](IMPLANTACAO.md).
 
 ---
 

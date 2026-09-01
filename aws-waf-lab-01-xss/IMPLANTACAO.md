@@ -16,7 +16,9 @@ Guia didático de implantação do laboratório **exclusivamente pelo Console AW
 | Subdomínio SEM WAF | `site-sem-waf.dev.inhesta.net` |
 | Subdomínio COM WAF | `site-com-waf.dev.inhesta.net` |
 | Web ACL (pacote de proteção) | `waf-lab-xss` |
-| Regra do WAF | `Block-XSS-Lab` |
+| Regra do WAF (XSS) | `Block-XSS-Lab` |
+| Regra do WAF (Geo) | `Block-Fora-do-Brasil` |
+| Resposta personalizada (403) | `acesso-negado-br` |
 | Objeto raiz padrão | `index.html` |
 
 > **Ordem das etapas:** S3 → ACM → CloudFront (as duas distribuições) → WAF → Política do bucket → Route 53 → Testes → CloudWatch → Exclusão.
@@ -193,6 +195,44 @@ Clique em **Criar distribuição** novamente e repita **exatamente** o processo 
     - (Ignore "Pre-parse text transformations", "Resposta personalizada" e "Adicionar rótulos" — não são necessários.)
 4. Clique em **Adicionar regra**. A regra `Block-XSS-Lab` deve aparecer como **Salvo** no painel da direita.
 
+**Criar a resposta personalizada (página HTML de acesso negado)**
+
+> Vamos configurar o WAF para, ao bloquear um acesso de fora do Brasil, responder com uma **página HTML personalizada** (`site/acesso-negado.html` deste projeto) em vez da página de erro padrão. A resposta personalizada é definida **na Web ACL** e depois referenciada pela regra de geo-bloqueio.
+
+O corpo da resposta é cadastrado em **Corpos de resposta personalizados (Custom response bodies)** da Web ACL:
+
+1. Ainda na tela de criação da Web ACL, role até a seção **Corpos de resposta personalizados (Custom response bodies)** (fica abaixo das regras) e clique em **Adicionar corpo de resposta personalizado**.
+2. **Nome do corpo da resposta:** digite `acesso-negado-br`.
+3. **Tipo de conteúdo:** selecione **HTML**.
+4. **Conteúdo do corpo da resposta:** cole **todo** o conteúdo do arquivo `site/acesso-negado.html` deste projeto.
+   - Limite do WAF: o corpo deve ter até **10 KB**. A página deste lab já está enxuta e dentro do limite.
+5. Clique em **Salvar** (o corpo fica disponível para ser usado nas regras).
+
+**Adicionar a regra de Geo-bloqueio (fora do Brasil) com resposta personalizada**
+
+> Esta regra bloqueia **qualquer requisição cujo país de origem não seja o Brasil (BR)** e retorna a página HTML de acesso negado. O WAF determina o país pela **geolocalização do IP de origem**.
+
+1. No painel **Adicionar regras**, clique novamente em **Adicionar regra** e selecione **Regra personalizada** (Crie regras personalizadas) e clique em **Seguinte**.
+2. No construtor da regra, preencha:
+    - **Nome da regra:** digite `Block-Fora-do-Brasil`.
+    - **Se uma solicitação:** troque para **não corresponde à instrução (does not match the statement / NOT)** — assim a regra vale para tudo que **não** for a origem escolhida. (Alternativamente, deixe "corresponde à instrução" e ative o botão **Negar resultados da instrução / Negate statement results**.)
+    - **Inspecionar:** abra o dropdown e escolha **Origem geográfica (Originates from a country in)**.
+    - **Códigos de país:** selecione **Brazil - BR**.
+    - **Endereço IP a usar:** deixe **Endereço IP de origem (Source IP address)**.
+    - Resultado lógico: a regra corresponde quando o país de origem **não** é o Brasil.
+3. Em **Ação (Action)**, selecione **Block**.
+4. Expanda **Resposta personalizada (Custom response)** e marque **Habilitar resposta personalizada**.
+    - **Código de resposta:** digite `403`.
+    - **Escolher corpo de resposta personalizado:** selecione `acesso-negado-br` (o que você cadastrou acima).
+    - (Opcional) Em **Cabeçalhos de resposta**, adicione `Content-Type` = `text/html` se o console não preencher automaticamente.
+5. Clique em **Adicionar regra**. A regra `Block-Fora-do-Brasil` deve aparecer como **Salvo**.
+
+**Ordem e prioridade das regras**
+
+1. Confirme que a Web ACL tem duas regras: `Block-XSS-Lab` e `Block-Fora-do-Brasil`.
+2. Recomenda-se deixar `Block-Fora-do-Brasil` com **prioridade mais alta** (avaliada primeiro): assim uma origem estrangeira já recebe a página de acesso negado antes de qualquer inspeção de XSS. Use as setas de prioridade se necessário.
+3. Somente `Block-Fora-do-Brasil` usa a resposta personalizada; o `Block-XSS-Lab` continua com o 403 padrão do CloudFront/WAF.
+
 **Nome e descrição do pacote (rolar para baixo)**
 
 1. Na seção **Nome e descrição**, no campo **Nome**, digite `waf-lab-xss` (campo obrigatório).
@@ -265,8 +305,9 @@ Como você marcou **"Allow private S3 bucket access to CloudFront"** ao criar as
 
 - **SEM WAF (normal):** `https://site-sem-waf.dev.inhesta.net/` → carrega o site (200).
 - **SEM WAF (XSS):** `https://site-sem-waf.dev.inhesta.net/?search=<script>alert(1)</script>` → passa (não bloqueado).
-- **COM WAF (normal):** `https://site-com-waf.dev.inhesta.net/` → carrega o site (200).
-- **COM WAF (XSS):** `https://site-com-waf.dev.inhesta.net/?search=<script>alert(1)</script>` → **HTTP 403**.
+- **COM WAF (normal, a partir do Brasil):** `https://site-com-waf.dev.inhesta.net/` → carrega o site (200).
+- **COM WAF (XSS, a partir do Brasil):** `https://site-com-waf.dev.inhesta.net/?search=<script>alert(1)</script>` → **HTTP 403** (regra `Block-XSS-Lab`).
+- **COM WAF (a partir de fora do Brasil — VPN/instância em outro país):** qualquer rota → **HTTP 403** com a **página HTML de acesso negado** (regra `Block-Fora-do-Brasil`).
 
 ### Com os scripts
 
@@ -306,59 +347,24 @@ COM WAF
 
 1. Abra **WAF & Shield > Web ACLs** (escopo **CloudFront (global)**) e clique em `waf-lab-xss`.
 2. Na aba **Visão geral (Overview)**, veja **Solicitações permitidas** e **Solicitações bloqueadas** — `BlockedRequests` aumenta após o teste de XSS.
-3. Abra a aba **Solicitações de amostra (Sampled requests)**, escolha a janela de tempo do teste e localize a requisição com:
-   - **Ação: BLOCK**
-   - **Regra correspondente: `Block-XSS-Lab`**
-   - Query string contendo `<script>...`.
+3. Abra a aba **Solicitações de amostra (Sampled requests)**, escolha a janela de tempo do teste e localize as requisições bloqueadas:
+   - **XSS:** **Ação: BLOCK**, **Regra: `Block-XSS-Lab`**, query string contendo `<script>...`.
+   - **Fora do Brasil:** **Ação: BLOCK**, **Regra: `Block-Fora-do-Brasil`**, com o **país (Country)** diferente de **BR**.
 
-Isso confirma que a regra `Block-XSS-Lab` foi a responsável pelo bloqueio.
+Isso confirma qual regra foi a responsável por cada bloqueio.
 
 ---
 
 ## Etapa 9 — Exclusão de recursos (faça ao terminar)
 
-> A **Web ACL do WAF é o principal custo contínuo**. Exclua tudo ao concluir, na ordem inversa da criação.
+> A **Web ACL do WAF é o principal custo contínuo**. Exclua tudo ao concluir. Ordem inversa da criação.
 
-### 9.1 Route 53
-1. Abra **Route 53 > Zonas hospedadas > `dev.inhesta.net`**.
-2. Marque os registros `site-sem-waf` e `site-com-waf` e clique em **Excluir registros**.
+1. **Route 53:** exclua os registros `site-sem-waf` e `site-com-waf`.
+2. **AWS WAF:** em **Web ACLs > `waf-lab-xss`**, remova a associação com a distribuição COM WAF e exclua a Web ACL. Isso remove as **duas regras** (`Block-XSS-Lab` e `Block-Fora-do-Brasil`) e o corpo de resposta personalizado `acesso-negado-br`.
+3. **CloudFront:** desative e exclua as duas distribuições (`waf-lab-01-xss-sem-waf` e `waf-lab-01-xss-com-waf`).
+4. **S3:** esvazie e exclua o bucket `waf-lab-01-xss-SUFIXO` (o `index.html` e o `acesso-negado.html` que você tenha publicado).
+5. **ACM (opcional):** exclua o certificado se não for reutilizar.
 
-### 9.2 CloudFront
-1. Abra **CloudFront**, marque a distribuição e clique em **Desabilitar (Disable)**.
-2. Aguarde ficar **Deployed** (já desabilitada) e clique em **Excluir (Delete)**.
-3. Repita para a segunda distribuição.
+> A página `site/acesso-negado.html` fica embutida no corpo de resposta da Web ACL — não é necessário hospedá-la no S3 para o geo-bloqueio funcionar. Publicá-la no bucket é opcional (útil apenas se você quiser abri-la direto no navegador).
 
-### 9.3 AWS WAF
-1. Abra **WAF & Shield > Web ACLs** (CloudFront global) e clique em `waf-lab-xss`.
-2. Na aba **Recursos AWS associados**, remova a associação restante (se houver).
-3. Volte à lista, marque `waf-lab-xss` e clique em **Excluir**.
 
-### 9.4 Amazon S3
-1. Abra o bucket `waf-lab-01-xss-SUFIXO`, clique em **Esvaziar** e confirme.
-2. Depois clique em **Excluir** o bucket.
-
-### 9.5 ACM (opcional)
-1. Em **ACM (us-east-1)**, selecione o certificado e clique em **Excluir** (só quando não estiver mais associado a nenhuma distribuição).
-
-### Checklist final
-- [ ] Registros Alias removidos do Route 53
-- [ ] Duas distribuições CloudFront excluídas
-- [ ] Web ACL `waf-lab-xss` excluída
-- [ ] Bucket S3 esvaziado e excluído
-- [ ] Certificado ACM excluído (opcional)
-- [ ] Nenhum recurso do laboratório restante gerando custo
-
----
-
-## Solução de problemas rápida
-
-| Sintoma | O que verificar |
-|---|---|
-| 403 nos **dois** endpoints (até normal) | Política do bucket / OAC (Etapa 5); aguarde a distribuição ficar **Deployed**. |
-| Raiz `/` não carrega (mas `/index.html` sim) | Faltou definir **Default root object = index.html** na distribuição. |
-| COM WAF **não** bloqueia XSS (200) | Web ACL `waf-lab-xss` associada à distribuição COM WAF? Regra com ação **Block**? Inspecionando a query string? Adicionou **URL decode**? |
-| SEM WAF **bloqueia** XSS | A distribuição SEM WAF não deve ter nenhuma Web ACL associada. |
-| Certificado não aparece no CloudFront | Precisa estar em **us-east-1** e com status **Emitido**. |
-| Erro de SSL / nome não confere | O domínio alternativo (CNAME) da distribuição precisa bater com o subdomínio e ser coberto pelo certificado. |
-| DNS não resolve | Confira os registros Alias no Route 53 e aguarde a propagação. |
-| Métricas não aparecem | CloudWatch metrics e Sampled requests habilitados; aguarde alguns minutos. |

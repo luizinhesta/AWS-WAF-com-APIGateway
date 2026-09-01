@@ -30,7 +30,8 @@ Nomes de referência:
 | Subdomínio sem WAF | `alb-sem-waf.SEU-DOMINIO.com` |
 | Subdomínio com WAF | `alb-com-waf.SEU-DOMINIO.com` |
 | Web ACL | `waf-lab-path-traversal` |
-| Regra do WAF | `Block-Path-Traversal-Lab` |
+| Regra do WAF (Path Traversal) | `Block-Path-Traversal-Lab` |
+| Regra do WAF (CAPTCHA/Geo) | `Captcha-Fora-do-Brasil` |
 
 ---
 
@@ -228,12 +229,38 @@ Crie **dois** ALBs. Os dois usam as **2 subnets públicas** e o SG `sg-alb-lab02
     - **Transformação de texto:** clique em **Adicionar** e escolha **URL decode** (captura também a forma `%2e%2e%2f`).
 5. Em **Ação (Action)**, selecione **Bloquear (Block)**.
 6. Clique em **Adicionar regra**.
-7. Em **Ação padrão da Web ACL**, deixe **Permitir (Allow)**.
-8. Revise e clique em **Criar pacote de proteção (ACL da Web)**.
 
-> Alternativa mais abrangente: usar um **Regex Pattern Set** com um padrão como `\.\./` via *Regex pattern set match*. Para o lab, o *Contains string* `../` já é suficiente.
+**Personalizar pacote de proteção — adicionar a regra de CAPTCHA (acesso apenas do Brasil)**
 
-> Para associar o ALB depois (se você pulou o passo 7-8): **WAF > Web ACLs > `waf-lab-path-traversal` > aba Recursos AWS associados > Adicionar recursos AWS** e selecione `alb-com-waf-lab02`.
+> Objetivo: permitir o acesso ao site **direto quando a origem é o Brasil** e **exigir um CAPTCHA quando a origem está fora do Brasil**. Assim, o site só é acessado por quem resolve o desafio (evitando acesso automatizado de fora do país). O CAPTCHA do WAF é renderizado como uma **página interativa no navegador** — por isso o teste principal desta regra é feito **pelo navegador**.
+
+1. Ainda em **Personalizar pacote de proteção**, clique novamente em **Adicionar regras > Adicionar minha própria regra e grupos de regras** e escolha **Construtor de regras (Rule builder)**.
+2. Em **Nome**, digite `Captcha-Fora-do-Brasil`. Em **Tipo**, deixe **Regra normal**.
+3. Em **Instrução (Statement)**:
+    - **Inspecionar:** selecione **Originates from a country in (Origina-se de um país em)**.
+    - Ative o botão **Negate statement results (Negar resultados da instrução)** — a regra passa a corresponder quando o país **NÃO** é o selecionado.
+    - Em **Country codes (Códigos de país)**, selecione **Brazil - BR**.
+    - **Endereço IP a usar para determinar o país de origem:** deixe **Source IP address (Endereço IP de origem)**.
+    - Resultado lógico: a regra corresponde quando a origem está **fora do Brasil**.
+4. Em **Ação (Action)**, selecione **CAPTCHA**.
+    - Em **Imunidade (Immunity time)**, deixe o padrão (ex.: 300 segundos). É o tempo em que o navegador não precisa refazer o desafio após resolvê-lo uma vez.
+5. Clique em **Adicionar regra**.
+
+**Ordem e prioridade das regras**
+
+1. Confirme que a Web ACL tem duas regras: `Block-Path-Traversal-Lab` (ação **Block**) e `Captcha-Fora-do-Brasil` (ação **CAPTCHA**).
+2. Recomenda-se deixar `Block-Path-Traversal-Lab` com **prioridade mais alta** (avaliada primeiro): um ataque de path traversal deve ser **bloqueado** de imediato, sem oferecer CAPTCHA. Ajuste com as setas de prioridade se necessário.
+   - Com essa ordem: uma requisição de fora do Brasil **com** `../` é **bloqueada** (Block vence); uma requisição de fora do Brasil **sem** `../` recebe o **CAPTCHA**; uma requisição do Brasil sem `../` passa direto.
+3. Em **Ação padrão da Web ACL**, deixe **Permitir (Allow)**.
+4. Revise e clique em **Criar pacote de proteção (ACL da Web)**.
+
+> Alternativa mais abrangente para o path traversal: usar um **Regex Pattern Set** com um padrão como `\.\./` via *Regex pattern set match*. Para o lab, o *Contains string* `../` já é suficiente.
+
+> **Sobre o CAPTCHA:** ele foi feito para clientes que rodam JavaScript e renderizam a página (navegadores). Scripts simples (curl, `Invoke-WebRequest`, os scripts de teste deste lab) **não resolvem** o desafio — eles recebem **HTTP 405** com o corpo do CAPTCHA. Por isso, valide o CAPTCHA **pelo navegador**.
+
+> Para associar o ALB depois (se você pulou a associação): **WAF > Web ACLs > `waf-lab-path-traversal` > aba Recursos AWS associados > Adicionar recursos AWS** e selecione `alb-com-waf-lab02`.
+
+> Para adicionar/editar a regra de CAPTCHA depois da criação: **WAF > Web ACLs > `waf-lab-path-traversal` > aba Regras (Rules) > Adicionar regras > Adicionar minha própria regra e grupos de regras > Rule builder** e repita os passos acima.
 
 ---
 
@@ -255,8 +282,9 @@ Veja o passo a passo completo em [TESTE.md](TESTE.md). Resumo:
 
 - **SEM WAF + normal** → chega ao Nginx (200).
 - **SEM WAF + Path Traversal** (`?file=../../etc/passwd`) → chega ao Nginx (200/404) e **aparece no access.log**.
-- **COM WAF + normal** → chega ao Nginx (200).
+- **COM WAF + normal (do Brasil)** → chega ao Nginx (200).
 - **COM WAF + Path Traversal** → **HTTP 403** e **não aparece no access.log**.
+- **COM WAF + normal (de fora do Brasil, pelo navegador)** → aparece a **página de CAPTCHA**; só chega ao site após resolver o desafio.
 
 Scripts:
 
@@ -282,7 +310,7 @@ python tests/test-path-traversal.py --sem-waf https://alb-sem-waf.SEU-DOMINIO.co
 
 1. **WAF > Web ACLs > `waf-lab-path-traversal`**.
 2. Em **Recursos AWS associados**, remova a associação com `alb-com-waf-lab02`.
-3. Exclua a Web ACL.
+3. Exclua a Web ACL (isso remove as duas regras: `Block-Path-Traversal-Lab` e `Captcha-Fora-do-Brasil`).
 
 ### 12.3 Application Load Balancers
 
@@ -330,6 +358,9 @@ python tests/test-path-traversal.py --sem-waf https://alb-sem-waf.SEU-DOMINIO.co
 | 502/504 no ALB | EC2 rodando, Nginx ativo, SG da EC2 liberando o SG do ALB na porta 80. |
 | COM WAF **não** bloqueia `../` | Web ACL associada ao `alb-com-waf-lab02`? Regra com ação **Block**? Inspecionando query string? Transformação **URL decode** aplicada? |
 | SEM WAF retorna 403 | O ALB SEM WAF não deve ter Web ACL associada. |
+| CAPTCHA aparece **mesmo do Brasil** | Regra `Captcha-Fora-do-Brasil` provavelmente sem o **Negate statement**. Ative o botão **Negate** e confirme o país **BR**. |
+| CAPTCHA **não** aparece de fora do Brasil | Seu IP realmente sai por outro país? (confirme em site de "meu IP"). A ação da regra é **CAPTCHA**? Está testando pelo **navegador** (não por script)? |
+| De fora do Brasil recebo **405** em vez da página | ✅ Esperado quando o cliente é um **script** (curl/Invoke-WebRequest): o 405 traz o corpo do CAPTCHA. Use o **navegador** para ver e resolver o desafio. |
 | Certificado não aparece no ALB | Precisa estar **Emitido** e na **mesma região** do ALB. |
 | Não consigo abrir sessão SSM | Perfil IAM com `AmazonSSMManagedInstanceCore` anexado e a EC2 com saída para a internet (IP público / rota IGW). |
 | DNS não resolve | Registros Alias corretos no Route 53; aguarde propagação. |

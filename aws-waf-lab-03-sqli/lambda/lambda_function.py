@@ -100,7 +100,7 @@ def handle_info():
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AWS WAF Security Lab - Projeto 03</title>
+  <title>AWS WAF Security Lab - Projeto 03 | Proteção SQL Injection</title>
   <style>
     :root { --dark:#0f1b2d; --orange:#ff9900; --text:#e6edf3; --muted:#9fb3c8; --card:#1b2a41; --border:#2a3d59; }
     * { margin:0; padding:0; box-sizing:border-box; }
@@ -123,9 +123,8 @@ def handle_info():
 <body>
   <header class="hero">
     <div class="badge">AWS WAF Security Lab</div>
-    <h1>Projeto 03</h1>
-    <h2>Proteção contra SQL Injection</h2>
-    <p>API Gateway REST + AWS Lambda</p>
+    <h1>Proteção contra SQL Injection</h1>
+    <h2>API Gateway REST + AWS Lambda</h2>
   </header>
   <main>
     <section class="card">

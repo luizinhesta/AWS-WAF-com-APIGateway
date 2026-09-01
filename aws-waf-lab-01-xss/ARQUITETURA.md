@@ -16,7 +16,7 @@ O laboratório expõe **dois subdomínios** que servem o **mesmo conteúdo** de 
              +---------------+---------------+
              |                               |
              v                               v
-    s3-sem-waf.dominio.com          s3-com-waf.dominio.com
+  site-sem-waf.dominio.com        site-com-waf.dominio.com
              |                               |
              v                               v
     CloudFront SEM WAF              CloudFront COM WAF
@@ -43,7 +43,7 @@ O laboratório expõe **dois subdomínios** que servem o **mesmo conteúdo** de 
 | **ACM** | Certificado TLS público em `us-east-1` (obrigatório para CloudFront), validado por DNS. Habilita HTTPS. |
 | **CloudFront SEM WAF** | Distribuição com OAC, HTTPS, **sem** Web ACL associada. |
 | **CloudFront COM WAF** | Distribuição com OAC, HTTPS, **associada** à Web ACL `waf-lab-xss`. |
-| **AWS WAF** | 1 Web ACL de escopo **CloudFront (Global)** + 1 regra `Block-XSS-Lab` (XSS match statement). |
+| **AWS WAF** | 1 Web ACL de escopo **CloudFront (Global)** com 2 regras: `Block-XSS-Lab` (XSS match statement) e `Block-Fora-do-Brasil` (geo match, com resposta HTML personalizada). |
 | **Amazon S3** | Bucket **privado**, com Block Public Access ativado. Acesso somente via OAC do CloudFront. |
 | **CloudWatch** | Métricas `AllowedRequests` / `BlockedRequests` e Sampled Requests do WAF. |
 
@@ -54,7 +54,7 @@ O laboratório expõe **dois subdomínios** que servem o **mesmo conteúdo** de 
 ```
 Usuário
   ↓
-Route 53  (resolve s3-sem-waf.dominio.com para o CloudFront)
+Route 53  (resolve site-sem-waf.dominio.com para o CloudFront)
   ↓
 CloudFront SEM WAF  (sem Web ACL)
   ↓
@@ -70,20 +70,20 @@ Como **não há Web ACL** associada, uma requisição com padrão de XSS não é
 ```
 Usuário
   ↓
-Route 53  (resolve s3-com-waf.dominio.com para o CloudFront)
+Route 53  (resolve site-com-waf.dominio.com para o CloudFront)
   ↓
 CloudFront COM WAF
   ↓
 AWS WAF  (Web ACL waf-lab-xss)
   ↓
-Regra Block-XSS-Lab detecta o padrão de XSS na query string
-  ↓
-BLOCK
-  ↓
-HTTP 403  (a requisição NÃO chega ao S3)
+Block-Fora-do-Brasil  → origem fora do BR? → BLOCK (403 + página "Acesso negado")
+  ↓ (origem no Brasil)
+Block-XSS-Lab         → padrão de XSS na query string? → BLOCK (403 padrão)
+  ↓ (sem XSS)
+S3 privado (via OAC)
 ```
 
-O AWS WAF é avaliado **na borda do CloudFront, antes da origem**. Quando a regra `Block-XSS-Lab` encontra o padrão de XSS na query string, a requisição é bloqueada e o usuário recebe **HTTP 403**, sem que o S3 seja acessado.
+O AWS WAF é avaliado **na borda do CloudFront, antes da origem**. Se a origem estiver fora do Brasil, a regra `Block-Fora-do-Brasil` bloqueia e retorna **HTTP 403** com a **página HTML personalizada** de acesso negado. Se a origem for o Brasil mas a query string contiver o padrão de XSS, a regra `Block-XSS-Lab` bloqueia com **HTTP 403**. Em ambos os casos o S3 **não** é acessado.
 
 ---
 
@@ -96,6 +96,38 @@ O AWS WAF é avaliado **na borda do CloudFront, antes da origem**. Quando a regr
 - **Ação padrão da Web ACL:** `Allow` (tudo passa, exceto o que a regra bloqueia).
 
 O XSS match statement procura por padrões característicos de scripts (por exemplo `<script>`). Assim, `?search=<script>alert(1)</script>` é identificado e bloqueado, enquanto `?search=teste` passa normalmente.
+
+---
+
+## Como funciona a regra de Geo-bloqueio (fora do Brasil)
+
+- **Regra:** `Block-Fora-do-Brasil`.
+- **Tipo:** Geographic match (correspondência geográfica) com **Negate statement** ativo → corresponde quando o país de origem **não** é o Brasil.
+- **Configuração:** país = **Brazil (BR)**; IP usado = **Source IP address** (IP de origem da requisição).
+- **Ação:** `BLOCK` com **resposta personalizada**: código `403` e corpo HTML `acesso-negado-br` (o conteúdo de `site/acesso-negado.html`).
+
+O WAF determina o país pela **geolocalização do IP de origem**. Requisições do Brasil não correspondem à regra e seguem para a inspeção de XSS; requisições de qualquer outro país recebem **HTTP 403** com a **página de acesso negado** renderizada no navegador.
+
+```
+Origem no Brasil        →  regra NÃO corresponde  →  segue para a regra XSS
+Origem fora do Brasil   →  regra corresponde       →  BLOCK (403 + página HTML)
+```
+
+### Resposta personalizada (custom response)
+
+- O corpo HTML é cadastrado uma vez na Web ACL em **Corpos de resposta personalizados** com o nome `acesso-negado-br` e tipo **HTML** (limite de ~10 KB).
+- A regra de geo referencia esse corpo e define o **status 403**.
+- A página é **autocontida** (CSS embutido, sem dependências externas), pois o WAF entrega apenas o HTML — não busca arquivos no S3.
+
+---
+
+## Ordem de avaliação das regras
+
+Recomenda-se `Block-Fora-do-Brasil` com **prioridade mais alta** (avaliada primeiro): uma origem estrangeira recebe a página de acesso negado antes de qualquer inspeção de XSS. Efeitos combinados:
+
+- Fora do Brasil → **403 + página de acesso negado** (geo vence).
+- Do Brasil **com** XSS → **403** padrão (regra XSS).
+- Do Brasil **sem** XSS → passa para o S3.
 
 ---
 
@@ -115,5 +147,5 @@ Resultado: o conteúdo só é servido **através do CloudFront**, nunca por aces
 - **Escopo CloudFront (Global)** no WAF: exigido para associar a Web ACL a distribuições CloudFront; é gerenciado a partir de `us-east-1`.
 - **OAC** em vez de OAI (legado): é o método atual e recomendado pela AWS para acesso privado ao S3.
 - **Certificado ACM em `us-east-1`**: o CloudFront só aceita certificados dessa região.
-- **1 regra apenas** (`Block-XSS-Lab`): mantém o custo mínimo e o foco didático em XSS.
+- **2 regras** (`Block-XSS-Lab` + `Block-Fora-do-Brasil`): uma demonstra inspeção de conteúdo (XSS), a outra controle por origem geográfica com **resposta HTML personalizada**, mantendo o custo baixo.
 - **HTTP → Redirect → HTTPS**: configurado na Viewer Protocol Policy do CloudFront.

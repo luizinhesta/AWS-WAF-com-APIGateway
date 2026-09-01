@@ -12,8 +12,8 @@ REGRAS DE USO:
   - Sem threads, sem flood, sem DDoS. Sao apenas 4 requisicoes no total.
 
 Uso:
-  python test-xss.py --sem-waf https://s3-sem-waf.dominio.com \
-                     --com-waf https://s3-com-waf.dominio.com
+  python test-xss.py --sem-waf https://site-sem-waf.dominio.com \
+                     --com-waf https://site-com-waf.dominio.com
 """
 
 import argparse

@@ -11,7 +11,7 @@
       - Sem threads, sem flood, sem DDoS. Sao apenas 4 requisicoes no total.
 
     Uso:
-      .\test-xss.ps1 -UrlSemWaf "https://s3-sem-waf.dominio.com" -UrlComWaf "https://s3-com-waf.dominio.com"
+      .\test-xss.ps1 -UrlSemWaf "https://site-sem-waf.dominio.com" -UrlComWaf "https://site-com-waf.dominio.com"
 #>
 
 param(

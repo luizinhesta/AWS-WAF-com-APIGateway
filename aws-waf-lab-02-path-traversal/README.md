@@ -15,6 +15,11 @@ Publicar **dois endpoints** que apontam para a **mesma aplicação** (Nginx em u
 - **SEM WAF** — uma requisição com padrão de Path Traversal atravessa o ALB e **chega ao Nginx**.
 - **COM WAF** — a mesma requisição é **bloqueada com HTTP 403** antes de chegar à aplicação.
 
+O ALB COM WAF tem **duas proteções**:
+
+1. **Path Traversal** (`Block-Path-Traversal-Lab`) — bloqueia o padrão `../` na query string.
+2. **CAPTCHA por país** (`Captcha-Fora-do-Brasil`) — o site só é acessado **direto a partir do Brasil**; requisições de **fora do Brasil** recebem um **CAPTCHA** e só entram após resolvê-lo (evita acesso automatizado/fora do país). O teste dessa regra é feito **pelo navegador**.
+
 A principal evidência do laboratório é o **`access.log` do Nginx**: SEM WAF a requisição aparece no log; COM WAF ela é bloqueada e **não** aparece no log.
 
 ### O que este laboratório NÃO faz
@@ -47,7 +52,7 @@ O Nginx **não precisa retornar o arquivo**. O objetivo é apenas comparar se a 
 |---|---|
 | Amazon Route 53 | DNS dos subdomínios do laboratório |
 | AWS Certificate Manager (ACM) | Certificado TLS na região do ALB |
-| AWS WAF | 1 Web ACL **regional** (`waf-lab-path-traversal`) + 1 regra (`Block-Path-Traversal-Lab`) |
+| AWS WAF | 1 Web ACL **regional** (`waf-lab-path-traversal`) + 2 regras (`Block-Path-Traversal-Lab` e `Captcha-Fora-do-Brasil`) |
 | Application Load Balancer | Dois ALBs (um sem WAF, um com WAF) |
 | Target Group | Agrupa a EC2 como destino, com health check em `/health` |
 | Amazon EC2 (Ubuntu) | Instância que roda a aplicação |
@@ -127,8 +132,9 @@ COM WAF
 
 | Teste | SEM WAF | COM WAF |
 |---|---|---|
-| Normal | Chega ao Nginx | Chega ao Nginx |
+| Normal (do Brasil) | Chega ao Nginx | Chega ao Nginx |
 | Path Traversal | Chega ao Nginx | 403 WAF |
+| Acesso ao site de fora do Brasil (navegador) | Chega ao Nginx | CAPTCHA → só entra após resolver |
 | Health Check | Healthy | Healthy |
 
 ---
@@ -141,7 +147,7 @@ O **AWS WAF não possui gratuidade permanente**, e além dele este lab usa recur
 - **EC2** — custo por hora da instância (use uma instância pequena; pare/termine ao fim).
 - **AWS WAF** — Web ACL + regra + requisições.
 
-ACM é gratuito; Route 53 cobra pela zona hospedada; CloudWatch tem uso mínimo. Este lab evita recursos premium (1 Web ACL + 1 regra + poucas requisições). **Exclua tudo ao concluir** — o passo a passo de exclusão está no final de [IMPLANTACAO.md](IMPLANTACAO.md).
+ACM é gratuito; Route 53 cobra pela zona hospedada; CloudWatch tem uso mínimo. Este lab evita recursos premium (1 Web ACL + 2 regras: path traversal e CAPTCHA por país + poucas requisições). **Exclua tudo ao concluir** — o passo a passo de exclusão está no final de [IMPLANTACAO.md](IMPLANTACAO.md).
 
 ---
 

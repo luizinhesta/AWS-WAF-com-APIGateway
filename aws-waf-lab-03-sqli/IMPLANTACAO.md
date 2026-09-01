@@ -25,7 +25,8 @@ Nomes de referência:
 | Subdomínio sem WAF | `api-sem-waf.SEU-DOMINIO.com` |
 | Subdomínio com WAF | `api-com-waf.SEU-DOMINIO.com` |
 | Web ACL | `waf-lab-sqli` |
-| Regra do WAF | `Block-SQLi-Lab` |
+| Regra do WAF (SQLi) | `Block-SQLi-Lab` |
+| Regra do WAF (Geo) | `Block-Fora-do-Brasil` |
 
 ---
 
@@ -174,10 +175,32 @@ Crie **dois** domínios personalizados.
     - **Transformação de texto:** clique em **Adicionar** e escolha **URL decode** (opcional: também **HTML entity decode**).
 5. Em **Ação (Action)**, selecione **Bloquear (Block)**.
 6. Clique em **Adicionar regra**.
-7. Em **Ação padrão da Web ACL**, deixe **Permitir (Allow)**.
-8. Revise e clique em **Criar pacote de proteção (ACL da Web)**.
 
-> Para associar o stage depois (se você pulou o passo 7-8): **WAF > Web ACLs > `waf-lab-sqli` > aba Recursos AWS associados > Adicionar recursos AWS**, escolha API Gateway e selecione o stage `com-waf`.
+**Personalizar pacote de proteção — adicionar a regra de Geo-bloqueio (fora do Brasil)**
+
+> Esta segunda regra bloqueia **qualquer requisição cujo país de origem não seja o Brasil (BR)**. O WAF determina o país pelo **IP de origem** (banco de dados de geolocalização da AWS). Para demonstrar o bloqueio, você vai acessar o endpoint `com-waf` a partir de um **IP de fora do Brasil** (VPN ou instância em outra região/país).
+
+1. Ainda em **Personalizar pacote de proteção**, clique novamente em **Adicionar regras > Adicionar minha própria regra e grupos de regras** e escolha **Construtor de regras (Rule builder)**.
+2. Em **Nome**, digite `Block-Fora-do-Brasil`. Em **Tipo**, deixe **Regra normal**.
+3. Em **Instrução (Statement)**:
+    - **Inspecionar:** selecione **Originates from a country in (Origina-se de um país em)**.
+    - Como a intenção é bloquear todo mundo **exceto** o Brasil, marque a opção **NOT (negar a instrução)** — no Console, ative o botão **Negate statement results (Negar resultados da instrução)**.
+    - Em **Country codes (Códigos de país)**, selecione **Brazil - BR**.
+    - **Endereço IP a usar para determinar o país de origem:** deixe **Source IP address (Endereço IP de origem)**.
+    - Resultado lógico: a regra corresponde quando o país de origem **NÃO** é o Brasil.
+4. Em **Ação (Action)**, selecione **Bloquear (Block)**.
+5. Clique em **Adicionar regra**.
+
+**Ordem e prioridade das regras**
+
+1. Na lista de regras da Web ACL, confirme que existem duas regras: `Block-SQLi-Lab` e `Block-Fora-do-Brasil`.
+2. A ordem não altera o resultado deste lab (ambas as ações são **Block**), mas é comum deixar o **geo-bloqueio com prioridade mais alta** (avaliado primeiro), pois barra a origem antes de qualquer outra inspeção. Ajuste com as setas de prioridade se desejar.
+3. Em **Ação padrão da Web ACL**, deixe **Permitir (Allow)**.
+4. Revise e clique em **Criar pacote de proteção (ACL da Web)**.
+
+> Para associar o stage depois (se você pulou a associação de recursos): **WAF > Web ACLs > `waf-lab-sqli` > aba Recursos AWS associados > Adicionar recursos AWS**, escolha API Gateway e selecione o stage `com-waf`.
+
+> Para adicionar/editar a regra de geo depois da criação: **WAF > Web ACLs > `waf-lab-sqli` > aba Regras (Rules) > Adicionar regras > Adicionar minha própria regra e grupos de regras > Rule builder** e repita os passos acima.
 
 > **Importante:** associe a Web ACL **apenas** ao stage `com-waf`. O stage `sem-waf` fica sem WAF.
 
@@ -190,7 +213,8 @@ Crie **dois** domínios personalizados.
 Veja o passo a passo completo em [TESTE.md](TESTE.md). Resumo:
 
 - **SEM WAF:** `/health` 200, `/produto?id=123` 200, `/produto?id=1' OR '1'='1` 200 (Lambda executa).
-- **COM WAF:** `/health` 200, `/produto?id=123` 200, `/produto?id=1' OR '1'='1` **403** (Lambda **não** executa).
+- **COM WAF (a partir do Brasil):** `/health` 200, `/produto?id=123` 200, `/produto?id=1' OR '1'='1` **403** (regra SQLi; Lambda **não** executa).
+- **COM WAF (a partir de fora do Brasil — VPN/instância em outro país):** **todas** as rotas retornam **403** (regra `Block-Fora-do-Brasil`), inclusive `/health`.
 
 Scripts:
 
@@ -214,7 +238,7 @@ python tests/test-sqli.py --sem-waf https://api-sem-waf.SEU-DOMINIO.com --com-wa
 ### 8.2 AWS WAF
 1. **WAF > Web ACLs > `waf-lab-sqli`**.
 2. Em **Recursos AWS associados**, remova a associação com o stage `com-waf`.
-3. Exclua a Web ACL.
+3. Exclua a Web ACL (isso remove as duas regras: `Block-SQLi-Lab` e `Block-Fora-do-Brasil`).
 
 ### 8.3 Custom Domains
 - **API Gateway > Nomes de domínio personalizados**, exclua `api-sem-waf...` e `api-com-waf...`.
@@ -249,7 +273,9 @@ python tests/test-sqli.py --sem-waf https://api-sem-waf.SEU-DOMINIO.com --com-wa
 |---|---|
 | COM WAF **não** bloqueia o SQLi (200) | Web ACL associada ao stage `com-waf`? Regra com ação **Block**? Inspecionando query string? Transformação **URL decode**? |
 | SEM WAF retorna 403 | O stage `sem-waf` não deve ter Web ACL associada. |
-| 403 em **todas** as rotas COM WAF | A regra SQLi não deveria bloquear `/health` nem `/produto?id=123` — revise a instrução da regra. |
+| 403 em **todas** as rotas COM WAF (mesmo do Brasil) | Provável a regra `Block-Fora-do-Brasil` invertida. Confirme que o botão **Negate statement results** está ativo e que o país selecionado é **BR**. Sem o NOT, ela bloqueia o próprio Brasil. |
+| Geo-bloqueio **não** bloqueia fora do BR | O IP de teste realmente sai por outro país? Verifique em um site de "meu IP". A VPN pode estar com servidor no Brasil. Confirme a ação **Block** e o código **BR** na regra. |
+| `/health` bloqueado (403) de fora do BR | ✅ Esperado: o geo-bloqueio barra qualquer rota vinda de fora do Brasil, antes da regra SQLi. |
 | Custom Domain não resolve | Registro Alias correto no Route 53 apontando para o alvo do Custom Domain; aguarde propagação. |
 | Certificado não aparece no Custom Domain | Precisa estar **Emitido** e na **mesma região** (Custom Domain Regional). |
 | `{proxy+}` retorna 403/Missing Authentication | Verifique o mapeamento de API e se o método/integração proxy foi criado e implantado nos stages. |

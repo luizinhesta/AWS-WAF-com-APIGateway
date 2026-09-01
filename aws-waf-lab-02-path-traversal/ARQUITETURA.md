@@ -50,7 +50,7 @@ O laboratório expõe **dois subdomínios**, cada um com seu **Application Load 
 | **ACM** | Certificado TLS público na **mesma região do ALB**, validado por DNS. Habilita HTTPS. |
 | **ALB SEM WAF** | Application Load Balancer sem Web ACL. |
 | **ALB COM WAF** | Application Load Balancer com a Web ACL `waf-lab-path-traversal` associada. |
-| **AWS WAF** | Web ACL **regional** + regra `Block-Path-Traversal-Lab` (detecta `../` e `%2e%2e%2f`). |
+| **AWS WAF** | Web ACL **regional** com 2 regras: `Block-Path-Traversal-Lab` (detecta `../` e `%2e%2e%2f`, ação Block) e `Captcha-Fora-do-Brasil` (geo match, exige CAPTCHA fora do BR). |
 | **Target Group(s)** | Agrupam a EC2 como destino; health check em `/health` esperando HTTP 200. |
 | **EC2 (Ubuntu)** | Instância que roda o Nginx e serve o site. |
 | **Nginx** | Servidor web; responde `/` (site) e `/health` (JSON). |
@@ -139,14 +139,14 @@ Route 53   (resolve alb-com-waf.dominio.com para o ALB COM WAF)
   ↓
 AWS WAF   (Web ACL waf-lab-path-traversal)
   ↓
-Regra Block-Path-Traversal-Lab detecta o padrão ../ (ou %2e%2e%2f)
-  ↓
-BLOCK
-  ↓
-HTTP 403   (a requisição NÃO chega ao ALB/EC2)
+Block-Path-Traversal-Lab  → contém ../ (ou %2e%2e%2f)? → BLOCK (403)
+  ↓ (sem path traversal)
+Captcha-Fora-do-Brasil    → origem fora do BR? → CAPTCHA (405 p/ scripts)
+  ↓ (origem no Brasil)
+Encaminha ao Target Group → EC2 / Nginx
 ```
 
-O AWS WAF é avaliado **no ALB, antes de encaminhar ao Target Group**. Quando a regra encontra o padrão de Path Traversal, retorna **HTTP 403** e a requisição **não aparece no `access.log`** da EC2 — essa ausência é a principal evidência do laboratório.
+O AWS WAF é avaliado **no ALB, antes de encaminhar ao Target Group**. Se a requisição contém o padrão de Path Traversal, a regra `Block-Path-Traversal-Lab` retorna **HTTP 403** e a requisição **não aparece no `access.log`** da EC2 — essa ausência é a principal evidência do laboratório. Se a origem está fora do Brasil (sem path traversal), a regra `Captcha-Fora-do-Brasil` exige o desafio e a requisição só chega ao Nginx **depois** de resolvido.
 
 ---
 
@@ -158,6 +158,36 @@ O AWS WAF é avaliado **no ALB, antes de encaminhar ao Target Group**. Quando a 
 - **Como implementar:** Byte Match Statement (contém a string `../`) ou um Regex Pattern Set simples. Aplicar transformação de texto **URL decode** para capturar a forma codificada.
 - **Ação:** `BLOCK`.
 - **Ação padrão da Web ACL:** `Allow`.
+
+---
+
+## Como funciona a regra de CAPTCHA por país (fora do Brasil)
+
+- **Web ACL:** a mesma `waf-lab-path-traversal` (regional, associada ao `alb-com-waf-lab02`).
+- **Regra:** `Captcha-Fora-do-Brasil`.
+- **Statement:** Geographic match com **Negate statement** ativo → corresponde quando o país de origem **não** é o Brasil.
+- **Configuração:** país = **Brazil (BR)**; IP usado = **Source IP address**.
+- **Ação:** `CAPTCHA` (com tempo de imunidade, ex.: 300s).
+
+O objetivo é **restringir o acesso ao site a partir do Brasil**: quem vem do Brasil entra direto; quem vem de fora recebe um **desafio de CAPTCHA** e só acessa após resolvê-lo. Isso ajuda a evitar acesso automatizado e de origens fora do país.
+
+```
+Origem no Brasil        →  regra NÃO corresponde  →  acesso direto ao site
+Origem fora do Brasil   →  regra corresponde       →  CAPTCHA → site após resolver
+```
+
+> O CAPTCHA é resolvido apenas em **navegadores** (executam JavaScript). Clientes automatizados recebem **HTTP 405** com o corpo do desafio, sem passar.
+
+---
+
+## Ordem de avaliação das regras
+
+Recomenda-se `Block-Path-Traversal-Lab` com **prioridade mais alta** (avaliada primeiro): um ataque de path traversal deve ser **bloqueado** imediatamente, sem oferecer CAPTCHA. Efeitos combinados:
+
+- Fora do Brasil **com** `../` → **403** (Block vence).
+- Fora do Brasil **sem** `../` → **CAPTCHA**.
+- Do Brasil **sem** `../` → passa direto.
+- Do Brasil **com** `../` → **403** (Block).
 
 ---
 
@@ -176,5 +206,5 @@ O AWS WAF é avaliado **no ALB, antes de encaminhar ao Target Group**. Quando a 
 - **Web ACL regional**: exigido para associar a um ALB (diferente do escopo CloudFront do Lab 01).
 - **SSM Session Manager** em vez de SSH: reduz superfície de ataque (porta 22 fechada).
 - **EC2 acessível só pelo SG do ALB**: a aplicação nunca é exposta diretamente à Internet.
-- **1 regra apenas** (`Block-Path-Traversal-Lab`): mantém o custo mínimo e o foco didático.
+- **2 regras** (`Block-Path-Traversal-Lab` + `Captcha-Fora-do-Brasil`): uma demonstra bloqueio por inspeção de conteúdo, a outra demonstra CAPTCHA por origem geográfica, mantendo o custo baixo e o foco didático.
 - **HTTP → Redirect → HTTPS**: configurado nos listeners do ALB.
