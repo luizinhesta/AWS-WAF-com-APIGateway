@@ -66,13 +66,8 @@ O Nginx **não precisa retornar o arquivo**. O objetivo é apenas comparar se a 
 
 ```
 aws-waf-lab-02-path-traversal/
-├── web/
-│   ├── index.html      (site do laboratório)
-│   ├── style.css
-│   └── health          (resposta do health check: {"status":"healthy"})
-│
 ├── scripts/
-│   └── install-nginx.sh (instala e configura o Nginx na EC2 Ubuntu)
+│   └── install-nginx.sh (instala o Nginx e publica o site completo: index.html, style.css e o endpoint /health na EC2 Ubuntu)
 │
 ├── tests/
 │   ├── test-path-traversal.py   (teste controlado em Python)
@@ -80,17 +75,18 @@ aws-waf-lab-02-path-traversal/
 │
 ├── README.md           (este arquivo — explicação do projeto)
 ├── ARQUITETURA.md      (arquitetura, VPC, security groups e como funciona)
-├── IMPLANTACAO.md      (passo a passo completo pelo Console AWS)
-└── TESTE.md            (passo a passo de como testar o WAF)
+└── IMPLANTACAO.md      (passo a passo completo pelo Console AWS, incluindo testes)
 ```
+
+> O conteúdo do site (`index.html`, `style.css`) e o endpoint `/health` são **gerados pelo próprio `scripts/install-nginx.sh`** no momento da instalação na EC2 — não há mais uma pasta `web/` no repositório.
 
 ---
 
 ## Como usar
 
 1. Leia a **arquitetura** em [ARQUITETURA.md](ARQUITETURA.md) para entender o fluxo, a VPC e os security groups.
-2. Siga o **passo a passo pelo Console** em [IMPLANTACAO.md](IMPLANTACAO.md) — inclui VPC, EC2/Nginx via SSM, ALB, Target Group, Health Check, ACM, Route 53, WAF e a exclusão ao final.
-3. Teste o WAF seguindo o **passo a passo de teste** em [TESTE.md](TESTE.md) (navegador, scripts, `access.log` e CloudWatch).
+2. Siga o **passo a passo pelo Console** em [IMPLANTACAO.md](IMPLANTACAO.md) — inclui VPC, EC2/Nginx via SSM, ALB, Target Group, Health Check, ACM, Route 53, WAF, **testes** (Etapa 11) e a exclusão ao final.
+3. Na **Etapa 11 (Testes)** do [IMPLANTACAO.md](IMPLANTACAO.md) você valida o WAF pelo navegador e pelos scripts, com **onde comprovar cada ataque** (Sampled requests, CloudWatch e `access.log`).
 
 ### Scripts de teste
 

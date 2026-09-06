@@ -194,7 +194,7 @@ Recomenda-se `Block-Path-Traversal-Lab` com **prioridade mais alta** (avaliada p
 ## Health Check
 
 - **Endpoint:** `/health`.
-- **Resposta:** HTTP `200` com corpo JSON `{"status":"healthy"}`.
+- **Resposta:** HTTP `200` com corpo JSON `{"status": "healthy"}`.
 - **Target Group:** Health Check Path = `/health`, código de sucesso `200`.
 - A instância precisa estar **Healthy** no Target Group antes de iniciar os testes.
 
