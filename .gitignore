@@ -1,30 +1,46 @@
-/vendor/
-node_modules/
-npm-debug.log
-yarn-error.log
+﻿# ==========================================================================
+# .gitignore - AWS WAF Security Lab 03 (SQL Injection)
+# Ignora artefatos gerados, caches e arquivos que nao fazem parte do projeto.
+# ==========================================================================
 
-# Laravel 4 specific
-bootstrap/compiled.php
-app/storage/
+# --- Especificacao do Kiro (spec: requirements/design/tasks) ---------------
+# Nao versionar a spec neste repositorio.
+.kiro/
 
-# Laravel 5 & Lumen specific
-public/storage
-public/hot
+# --- Caches de ferramentas de teste ----------------------------------------
+.pytest_cache/
+.hypothesis/
 
-# Laravel 5 & Lumen specific with changed public path
-public_html/storage
-public_html/hot
+# --- Bytecode e caches do Python -------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
 
-storage/*.key
-.env
-Homestead.yaml
-Homestead.json
-/.vagrant
-.phpunit.result.cache
+# --- Ambientes virtuais Python (caso venham a ser criados) -----------------
+.venv/
+venv/
+env/
+ENV/
 
-/public/build
-/storage/pail
-.env.backup
-.env.production
-.phpactor.json
-auth.json
+# --- Cobertura de testes / relatorios --------------------------------------
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+
+# --- Placeholder nao mais necessario (a pasta lambda ja tem codigo) --------
+lambda/.gitkeep
+
+# --- Arquivos de sistema operacional ---------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Arquivos de editores / IDEs -------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~

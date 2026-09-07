@@ -1,0 +1,4 @@
+# Dependências de teste do laboratório AWS WAF Security Lab 03 (SQL Injection)
+# Instale com: pip install -r tests/requirements-dev.txt
+pytest>=8.0
+hypothesis>=6.0
