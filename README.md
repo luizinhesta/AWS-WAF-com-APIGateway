@@ -119,7 +119,10 @@ aws-waf-lab-03-sqli/
 │   └── requirements-dev.txt       # Dependências de teste (pytest, hypothesis)
 ├── README.md                      # Este documento — visão geral do laboratório
 ├── ARQUITETURA.md                 # Arquitetura: fluxo de rede e componentes
-└── IMPLANTACAO.md                 # Guia passo a passo de implantação manual pelo Console AWS (pt-BR, inclui a fase de testes)
+├── IMPLANTACAO.md                 # Guia passo a passo de implantação manual pelo Console AWS (pt-BR)
+├── TESTES.md                      # Guia de testes de validação (sem WAF x com WAF, CloudWatch, Sampled requests, geo-bloqueio)
+├── EXCLUSAO.md                    # Guia de exclusão / teardown completo dos recursos
+└── ARTIGO.md                      # Artigo técnico consolidado do projeto
 ```
 
 - **`lambda/lambda_function.py`** — código executado nos dois stages, idêntico para ambos.
@@ -134,7 +137,7 @@ A implantação é **manual**, realizada pelo **Console da AWS em Português (Br
 
 Este laboratório **não** utiliza ferramentas de infraestrutura como código (**Terraform, CloudFormation, CDK, SAM**) nem automação de infraestrutura via **AWS CLI**. Os scripts existentes servem **exclusivamente para testes da API**.
 
-O passo a passo completo (certificado ACM, REST API, stages, Custom Domains, registros Route 53, Web ACL e regras do WAF), com nomes de menus em pt-BR e o original em inglês entre parênteses quando útil, está em [`IMPLANTACAO.md`](./IMPLANTACAO.md), que inclui a **Fase 17 — Testes de validação** com os cenários de comprovação (sem WAF x com WAF, CloudWatch e Sampled requests do WAF).
+O passo a passo completo (certificado ACM, REST API, stages, Custom Domains, registros Route 53, Web ACL e regras do WAF), com nomes de menus em pt-BR e o original em inglês entre parênteses quando útil, está em [`IMPLANTACAO.md`](./IMPLANTACAO.md). Os **testes de validação** (cenários de comprovação sem WAF x com WAF, CloudWatch, Sampled requests do WAF e geo-bloqueio) ficam em [`TESTES.md`](./TESTES.md), e a **exclusão completa dos recursos** em [`EXCLUSAO.md`](./EXCLUSAO.md).
 
 ---
 
@@ -151,7 +154,7 @@ Este laboratório utiliza recursos que podem gerar custos na sua conta AWS. Pont
 
 Recomendações para manter os custos baixos:
 
-- Use o laboratório por tempo limitado e **exclua todos os recursos ao terminar**, seguindo a fase de exclusão descrita em [`IMPLANTACAO.md`](./IMPLANTACAO.md).
+- Use o laboratório por tempo limitado e **exclua todos os recursos ao terminar**, seguindo o guia de exclusão em [`EXCLUSAO.md`](./EXCLUSAO.md).
 - Envie um **número reduzido de requisições** de teste (os scripts já seguem esse princípio).
 - Defina retenção de logs no CloudWatch para evitar acúmulo indefinido.
 
@@ -184,3 +187,6 @@ Os testes deste laboratório devem permanecer **éticos e restritos ao próprio 
 
 - [`ARQUITETURA.md`](./ARQUITETURA.md) — arquitetura de rede e componentes.
 - [`IMPLANTACAO.md`](./IMPLANTACAO.md) — guia de implantação manual pelo Console AWS (pt-BR).
+- [`TESTES.md`](./TESTES.md) — guia de testes de validação (sem WAF x com WAF, CloudWatch, Sampled requests, geo-bloqueio).
+- [`EXCLUSAO.md`](./EXCLUSAO.md) — guia de exclusão / teardown completo dos recursos.
+- [`ARTIGO.md`](./ARTIGO.md) — artigo técnico consolidado do projeto.
